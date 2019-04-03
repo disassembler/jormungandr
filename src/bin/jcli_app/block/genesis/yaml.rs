@@ -3,16 +3,15 @@ use chain_core::property::HasMessages as _;
 use chain_crypto::{bech32::Bech32, Ed25519Extended, PublicKey};
 use chain_impl_mockchain::{
     block::{Block, BlockBuilder, ConsensusVersion},
-    config::{
-        entity_from, entity_from_string, entity_to, entity_to_string, Block0Date, ConfigParam,
-    },
+    config::{entity_from_string, entity_to, Block0Date, ConfigParam},
     fee::LinearFee,
     legacy::{self, OldAddress},
-    message::{InitialEnts, Message},
+    message::{initial::Tag, InitialEnts, Message},
     setting::UpdateProposal,
     transaction,
     value::Value,
 };
+use jcli_app::utils::serde_with_string;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -45,22 +44,13 @@ pub struct Configuration(Vec<(String, String)>);
 pub struct Update {
     max_number_of_transactions_per_block: Option<u32>,
     bootstrap_key_slots_percentage: Option<u8>,
-    #[serde(with = "ConsensusVersionSerdeImpl")]
+    #[serde(with = "serde_with_string")]
     consensus: ConsensusVersion,
     bft_leaders: Option<Vec<String>>,
     allow_account_creation: Option<bool>,
     linear_fee: Option<InitialLinearFee>,
     slot_duration: u8,
     epoch_stability_depth: u32,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(remote = "ConsensusVersion", rename_all = "lowercase")]
-enum ConsensusVersionSerdeImpl {
-    None,
-    Bft,
-    #[serde(rename = "genesis")]
-    GenesisPraos,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -316,25 +306,22 @@ impl Update {
 
 impl Configuration {
     pub fn from_message(initial_ents: &InitialEnts) -> Self {
-        let mut data = Vec::with_capacity(initial_ents.iter().len());
+        fn parse_payload<T: ConfigParam>(payload: &Vec<u8>) -> (String, String) {
+            let value =
+                T::from_payload(payload).unwrap_or_else(|_| panic!("Failed to parse {}", T::NAME));
+            (T::NAME.to_string(), value.to_string())
+        }
 
-        for (t, v) in initial_ents.iter() {
-            match t {
-                &<Block0Date as ConfigParam>::TAG => {
-                    let t = entity_from::<Block0Date>(*t, v).expect("Failed to parse block0-date");
-                    let (k, v) = entity_to_string(&t);
-                    data.push((k.to_owned(), v));
-                }
-                &<Discrimination as ConfigParam>::TAG => {
-                    let t = entity_from::<Discrimination>(*t, v)
-                        .expect("Failed to parse discrimination");
-                    let (k, v) = entity_to_string(&t);
-                    data.push((k.to_owned(), v));
-                }
-                _ => panic!(),
+        fn parse_initial_ent((tag, payload): &(Tag, Vec<u8>)) -> (String, String) {
+            match *tag {
+                Block0Date::TAG => parse_payload::<Block0Date>(payload),
+                Discrimination::TAG => parse_payload::<Discrimination>(payload),
+                ConsensusVersion::TAG => parse_payload::<ConsensusVersion>(payload),
+                _ => panic!("Unknown tag"),
             }
         }
 
+        let data = initial_ents.iter().map(parse_initial_ent).collect();
         Configuration(data)
     }
 
