@@ -67,7 +67,8 @@ Fields description:
       - 2: debug
       - 3 and above: trace
     - *format*: log output format - plain or json.
-    - *output*: log output - stderr, syslog (unix only) or journald (linux with systemd only, must be enabled during compilation)
+    - *output*: log output - stderr, gelf (graylog), syslog (unix only) or journald (linux with systemd only, must be enabled during compilation)
+    - *backend*: for gelf output: hostname:port of a graylog server.
   - *rest*: (optional) configuration of the rest endpoint.
     - *listen*: listen address
     - *pkcs12*: certificate file (optional)

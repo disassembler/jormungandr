@@ -24,6 +24,7 @@ pub struct ConfigLogSettings {
     pub verbosity: Option<u8>,
     pub format: Option<LogFormat>,
     pub output: Option<LogOutput>,
+    pub backend: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
